@@ -393,12 +393,14 @@ const stepHandlers = {
       );
       const deliveryDestination =
         result.country === "china" ? "Уссурийска" : "Владивостока";
-      const totalDeliveryAndServices =
-        result.deliveryCost + result.оформленияSbktsepts;
       outputLines.push(
-        `- Расходы до ${deliveryDestination}: ${formatRub(
-          totalDeliveryAndServices
+        `- Доставка до ${deliveryDestination}: ${formatRub(
+          result.deliveryCost
         )}`
+      );
+      // Показываем услуги оформления отдельно
+      outputLines.push(
+        `- Услуги оформления/брокера: ${formatRub(result.оформленияSbktsepts)}`
       );
       outputLines.push(
         `- Таможенный платеж: ${formatRub(result.totalCustomsPayment)}`
