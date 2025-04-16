@@ -1,0 +1,30 @@
+// tsconfig.json (ИСПРАВЛЕННЫЙ)
+{
+  "compilerOptions": {
+    // Ваши существующие рабочие опции:
+    "target": "ES2020",
+    "module": "CommonJS", // Оставляем CommonJS для Node.js и require()
+    "outDir": "./dist",     // Куда компилировать JS
+    "rootDir": "./src",     // Где лежат исходники TS
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "sourceMap": true, // Полезно для отладки
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // --- Ключевые исправления для tsconfig-paths ---
+    "baseUrl": ".",
+
+    "paths": {
+      "@/*": ["./src/*"] 
+    }
+    // --- Конец исправлений ---
+
+  },
+  "include": ["src/**/*"], // Какие файлы включать в компиляцию
+  "exclude": ["node_modules", "**/*.spec.ts"] // Какие исключить
+}
