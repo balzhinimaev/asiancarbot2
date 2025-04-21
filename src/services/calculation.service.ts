@@ -1,52 +1,60 @@
 // --- src/services/calculation.service.ts ---
 import { Scenes } from "telegraf"; // Импортируем Scenes для WizardSessionData
 import { getExchangeRates } from "./currency.service";
-import { CalculateCarWizardSession } from "../types/telegraf"; // Импортируем тип сессии
+// Импортируем тип сессии (убедитесь, что он уже обновлен в types/telegraf.d.ts)
+import { CalculateCarWizardSession } from "../types/telegraf";
 
 // Определяем тип входных параметров для расчета
-// Omit убирает стандартные поля WizardSessionData и currency (т.к. валюта определяется внутри)
+// Omit убирает стандартные поля WizardSessionData и currency
 interface CalculationParams
   extends Omit<
     CalculateCarWizardSession,
-    keyof Scenes.WizardSessionData | "currency"
+    keyof Scenes.WizardSessionData | "currency" // Убираем currency, т.к. определяем его по стране
   > {
-  // Обязательные поля для всех расчетов
+  // Убедимся, что все нужные поля ОБЯЗАТЕЛЬНЫ для функции расчета
+  // Типы здесь уже должны быть обновлены в соответствии с types/telegraf.d.ts
   country: "korea" | "china" | "japan";
-  cost: number; // Стоимость в нац. валюте
-  fuelType: "petrol_diesel_hybrid" | "electric";
+  cost: number;
+  fuelType: "petrol_diesel" | "hybrid" | "electric"; // <<< ИЗМЕНЕНО
   carAge: "<3" | "3-5" | ">5";
-  // Опциональные, но обязательные в зависимости от fuelType
-  engineVolume?: number;
-  enginePower?: number;
+  // Опциональные здесь, но обязательные внутри логики функции
+  engineVolume?: number; // Объем для petrol_diesel и hybrid
+  enginePower?: number; // Мощность для electric
 }
 
-// Определяем интерфейс для результата расчета - ДОБАВЛЕНЫ ПОЛЯ
+// Определяем интерфейс для результата расчета (остается без изменений)
 export interface CalculationResult {
-  country: "korea" | "china" | "japan"; // Страна (для логики вывода)
-  costInOriginalCurrency: number; // Исходная стоимость в нац. валюте
-  originalCurrency: "KRW" | "CNY" | "JPY"; // Исходная валюта
-  costInRub: number; // Стоимость авто в рублях
-  costInEur: number; // Стоимость авто в евро (для логов/деталей)
-  deliveryCost: number; // Стоимость доставки
-  totalCustomsPayment: number; // Общий таможенный платеж (пошлина + акциз + ндс)
-  customsFees: number; // Таможенные сборы (ставка)
-  utilizationFee: number; // Утилизационный сбор
-  оформленияSbktsepts: number; // Услуги оформления
-  companyCommission: number; // Комиссия компании
-  totalCost: number; // Итоговая стоимость
-  details: string[]; // Массив строк с деталями расчета для логов
+  country: "korea" | "china" | "japan";
+  costInOriginalCurrency: number;
+  originalCurrency: "KRW" | "CNY" | "JPY";
+  costInRub: number;
+  costInEur: number;
+  deliveryCost: number;
+  totalCustomsPayment: number;
+  customsFees: number;
+  utilizationFee: number;
+  оформленияSbktsepts: number; // Услуги оформления/Брокер
+  companyCommission: number;
+  totalCost: number;
+  details: string[];
 }
 
-// --- Константы для расчета ---
+// --- Обновленные константы для расчета ---
 const DELIVERY_COST = {
+  // Удаляем Японию отсюда
   korea: { value: 2000000, currency: "KRW" as const },
   china: { value: 12000, currency: "CNY" as const, extraRub: 50000 },
-  japan: { value: 150000, currency: "JPY" as const },
 };
+// Новые константы для доставки из Японии
+const STANDARD_DELIVERY_JAPAN_JPY = 150000; // Стандартная доставка
+const SPECIAL_DELIVERY_JAPAN_MIN_JPY = 70000; // Минимальная ставка (от 5%)
+const SPECIAL_DELIVERY_JAPAN_EXTRA_RUB = 475000; // Добавка в рублях для спец. условий
+
 const SERVICES_COST = {
+  // Обновляем стоимость для Японии
   korea: 80000,
   china: 105000,
-  japan: 70000,
+  japan: 80000, // <<< ИЗМЕНЕНО (было 70000)
 };
 const COMPANY_COMMISSION = 50000;
 const UTILIZATION_FEE = {
@@ -55,9 +63,8 @@ const UTILIZATION_FEE = {
   ">5": 5200,
 };
 
-// --- Функция форматирования чисел ---
+// --- Функция форматирования чисел (без изменений) ---
 const formatRub = (value: number): string => {
-  // Форматируем как валюту RUB без копеек
   return value.toLocaleString("ru-RU", {
     style: "currency",
     currency: "RUB",
@@ -68,20 +75,19 @@ const formatNum = (
   value: number,
   maximumFractionDigits: number = 0
 ): string => {
-  // Форматируем просто число с нужным кол-вом знаков после запятой
   return value.toLocaleString("ru-RU", { maximumFractionDigits });
 };
 
-// --- Основная функция расчета ---
+// --- Основная функция расчета (С ИЗМЕНЕНИЯМИ) ---
 export const calculateCarCost = async (
   params: CalculationParams
 ): Promise<CalculationResult> => {
   const rates = await getExchangeRates(); // Получаем актуальные курсы
   const details: string[] = []; // Массив для детального лога расчета
 
-  // --- Валидация входных данных ---
+  // --- Валидация входных данных (ОБНОВЛЕНО) ---
   if (
-    params.fuelType === "petrol_diesel_hybrid" &&
+    (params.fuelType === "petrol_diesel" || params.fuelType === "hybrid") && // <<< ИЗМЕНЕНО
     typeof params.engineVolume !== "number"
   ) {
     throw new Error(
@@ -94,15 +100,18 @@ export const calculateCarCost = async (
   ) {
     throw new Error("Мощность двигателя обязательна для электромобилей.");
   }
+  // <<< ДОБАВЛЕНО: Запрет электро для Японии >>>
+  if (params.country === "japan" && params.fuelType === "electric") {
+    throw new Error("Расчет для электромобилей из Японии не поддерживается.");
+  }
   if (!rates.EUR || rates.EUR <= 0) {
     throw new Error("Не удалось получить или некорректный курс EUR.");
   }
   if (!params.carAge) {
-    // Добавим проверку на carAge на всякий случай
     throw new Error("Возраст автомобиля не указан.");
   }
 
-  // Определяем валюту и курс для страны
+  // Определяем валюту и курс для страны (без изменений)
   let nationalCurrency: "KRW" | "CNY" | "JPY";
   let nationalRate: number;
   switch (params.country) {
@@ -127,7 +136,7 @@ export const calculateCarCost = async (
     );
   }
 
-  // 1. Стоимость авто в рублях и евро
+  // 1. Стоимость авто в рублях и евро (без изменений)
   const costInRub = params.cost * nationalRate;
   const costInEur = Math.round(costInRub / rates.EUR);
   details.push(
@@ -139,35 +148,100 @@ export const calculateCarCost = async (
     `   (≈ ${formatNum(costInEur)} EUR @ ${formatNum(rates.EUR, 2)} RUB/EUR)`
   );
 
-  // 2. Доставка до Владивостока/Уссурийска
+  // 2. Доставка до Владивостока/Уссурийска (ЛОГИКА ИЗМЕНЕНА ДЛЯ ЯПОНИИ)
   let deliveryCost = 0;
-  const deliveryInfo = DELIVERY_COST[params.country];
-  const deliveryCurrencyRate = rates[deliveryInfo.currency];
-  if (!deliveryCurrencyRate || deliveryCurrencyRate <= 0) {
-    throw new Error(`Некорректный курс ${deliveryInfo.currency} для доставки.`);
+  details.push("2. Доставка:"); // Заголовок для ясности
+
+  if (params.country === "korea" || params.country === "china") {
+    // Логика для Кореи и Китая (как было)
+    const deliveryInfo = DELIVERY_COST[params.country];
+    const deliveryCurrencyRate = rates[deliveryInfo.currency];
+    if (!deliveryCurrencyRate || deliveryCurrencyRate <= 0) {
+      throw new Error(
+        `Некорректный курс ${deliveryInfo.currency} для доставки.`
+      );
+    }
+    deliveryCost = deliveryInfo.value * deliveryCurrencyRate;
+    const deliveryLogParts: string[] = [
+      `${formatNum(deliveryInfo.value)} ${deliveryInfo.currency}`,
+    ];
+    if ("extraRub" in deliveryInfo && deliveryInfo.extraRub) {
+      deliveryCost += deliveryInfo.extraRub;
+      deliveryLogParts.push(`${formatRub(deliveryInfo.extraRub)}`);
+    }
+    details.push(
+      `   - ${params.country.toUpperCase()}: (${deliveryLogParts.join(
+        " + "
+      )}) = ${formatRub(deliveryCost)}`
+    );
+  } else if (params.country === "japan") {
+    // Логика для Японии
+    const deliveryCurrencyRate = rates.JPY; // Используем курс JPY
+    if (!deliveryCurrencyRate || deliveryCurrencyRate <= 0) {
+      throw new Error(`Некорректный курс JPY для доставки.`);
+    }
+
+    // Определяем, применяются ли спец. условия
+    // Спец. условия: Гибрид ИЛИ (Бензин/Дизель И Объем > 1900)
+    const isSpecialDeliveryCase =
+      params.fuelType === "hybrid" ||
+      (params.fuelType === "petrol_diesel" && params.engineVolume! > 1900); // Используем non-null assertion !, т.к. объем проверен в валидации
+
+    if (isSpecialDeliveryCase) {
+      // Расчет для спец. условий
+      const costPercent = params.cost * 0.05; // 5% от стоимости авто в JPY
+      const baseDeliveryCostJPY = Math.max(
+        costPercent,
+        SPECIAL_DELIVERY_JAPAN_MIN_JPY
+      ); // Не менее 70 000 JPY
+      deliveryCost =
+        baseDeliveryCostJPY * deliveryCurrencyRate +
+        SPECIAL_DELIVERY_JAPAN_EXTRA_RUB; // (База * курс) + добавка в RUB
+
+      details.push(`   - JPN (Спец. условия: >1900cc или Гибрид)`);
+      details.push(
+        `     База JPY: max(5% от ${formatNum(params.cost)} JPY [=${formatNum(
+          costPercent
+        )}], ${formatNum(SPECIAL_DELIVERY_JAPAN_MIN_JPY)} JPY) = ${formatNum(
+          baseDeliveryCostJPY
+        )} JPY`
+      );
+      details.push(
+        `     Расчет: (${formatNum(baseDeliveryCostJPY)} JPY * ${formatNum(
+          deliveryCurrencyRate,
+          4
+        )} RUB/JPY) + ${formatRub(
+          SPECIAL_DELIVERY_JAPAN_EXTRA_RUB
+        )} = ${formatRub(deliveryCost)}`
+      );
+    } else {
+      // Стандартные условия для Японии (бензин/дизель <= 1900cc)
+      deliveryCost = STANDARD_DELIVERY_JAPAN_JPY * deliveryCurrencyRate; // Стандартная ставка * курс
+      details.push(`   - JPN (Стандарт: Бензин/Дизель <= 1900cc)`);
+      details.push(
+        `     Расчет: ${formatNum(
+          STANDARD_DELIVERY_JAPAN_JPY
+        )} JPY * ${formatNum(deliveryCurrencyRate, 4)} RUB/JPY = ${formatRub(
+          deliveryCost
+        )}`
+      );
+    }
   }
-  deliveryCost = deliveryInfo.value * deliveryCurrencyRate;
-  const deliveryLogParts: string[] = [
-    `${formatNum(deliveryInfo.value)} ${deliveryInfo.currency}`,
-  ];
-  if ("extraRub" in deliveryInfo && deliveryInfo.extraRub) {
-    deliveryCost += deliveryInfo.extraRub;
-    deliveryLogParts.push(`${formatRub(deliveryInfo.extraRub)}`);
-  }
-  details.push(
-    `2. Доставка (${deliveryLogParts.join(" + ")}): ${formatRub(deliveryCost)}`
-  );
+  // Добавляем пустую строку для разделения, если нужно
+  // details.push('');
 
   // 3. Расчет Таможенного ПЛАТЕЖА (пошлина + акциз + НДС)
   let totalCustomsPayment = 0;
   let customsDuty = 0;
   let excise = 0;
   let vat = 0;
+  // Отображаем корректный fuelType в логе
   details.push(
     `3. Таможенный платеж (Возраст: ${params.carAge}, Тип: ${params.fuelType}):`
   );
 
   if (params.fuelType === "electric") {
+    // Логика для электромобилей (остается без изменений)
     const enginePower = params.enginePower!;
     customsDuty = costInRub * 0.15;
     details.push(`   - Пошлина (15%): ${formatRub(customsDuty)}`);
@@ -188,6 +262,8 @@ export const calculateCarCost = async (
     details.push(`   - НДС (20% от суммы выше): ${formatRub(vat)}`);
     totalCustomsPayment = customsDuty + excise + vat;
   } else {
+    // Теперь это petrol_diesel ИЛИ hybrid
+    // Логика пошлины для не-электро (остается без изменений, т.к. зависит от объема/возраста/стоимости)
     const engineVolume = params.engineVolume!;
     switch (params.carAge) {
       case "<3": {
@@ -212,17 +288,18 @@ export const calculateCarCost = async (
           percentageRate = 0.48;
           euroPerCm3Rate = 20;
         }
+
         const dutyByPercentage = costInRub * percentageRate;
         const dutyByVolume = engineVolume * euroPerCm3Rate * rates.EUR;
         customsDuty = Math.max(dutyByPercentage, dutyByVolume);
         details.push(
           `   - Пошлина (max от ${formatRub(dutyByPercentage)} [${(
             percentageRate * 100
-          ).toFixed(0)}%] и ${formatRub(dutyByVolume)} [${formatNum(
+          ).toFixed(0)}%] или ${formatRub(dutyByVolume)} [${formatNum(
             engineVolume
-          )}см³*${euroPerCm3Rate}EUR])`
+          )}см³*${euroPerCm3Rate} EUR/см³])`
         );
-        break;
+        break; // <-- Убедитесь, что break здесь есть
       }
       case "3-5": {
         let euroPerCm3Rate = 0;
@@ -241,7 +318,7 @@ export const calculateCarCost = async (
             2
           )} RUB/EUR)`
         );
-        break;
+        break; // <-- Убедитесь, что break здесь есть
       }
       case ">5": {
         let euroPerCm3Rate = 0;
@@ -260,16 +337,17 @@ export const calculateCarCost = async (
             2
           )} RUB/EUR)`
         );
-        break;
+        break; // <-- Убедитесь, что break здесь есть
       }
     }
+    // Для не-электромобилей по этой схеме акциз и НДС не добавляются отдельно (считаются включенными в ставку EUR/см³)
     totalCustomsPayment = customsDuty;
   }
   details.push(
     `   - Итого таможенный платеж: ${formatRub(totalCustomsPayment)}`
   );
 
-  // 4. Таможенные сборы (ставка)
+  // 4. Таможенные сборы (ставка) - Без изменений
   let customsFees = 0;
   if (costInRub <= 1200000) customsFees = 3100;
   else if (costInRub <= 2700000) customsFees = 8530;
@@ -282,40 +360,42 @@ export const calculateCarCost = async (
   else customsFees = 30000;
   details.push(`4. Таможенные сборы (ставка): ${formatRub(customsFees)}`);
 
-  // 5. Утилизационный сбор
+  // 5. Утилизационный сбор - Без изменений
   const utilizationFee = UTILIZATION_FEE[params.carAge];
   details.push(`5. Утилизационный сбор: ${formatRub(utilizationFee)}`);
 
-  // 6. Услуги по оформлению
-  const оформленияSbktsepts = SERVICES_COST[params.country];
+  // 6. Услуги по оформлению / Брокер (СТОИМОСТЬ ОБНОВЛЕНА)
+  const оформленияSbktsepts = SERVICES_COST[params.country]; // Используем обновленную константу
   details.push(
-    `6. Услуги оформления (${params.country}): ${formatRub(
+    `6. Услуги оформления/Брокер (${params.country}): ${formatRub(
+      // <<< Изменен текст
       оформленияSbktsepts
     )}`
   );
 
-  // 7. Комиссия компании
+  // 7. Комиссия компании - Без изменений
   const companyCommission = COMPANY_COMMISSION;
   details.push(`7. Комиссия компании: ${formatRub(companyCommission)}`);
 
-  // --- Итоговая стоимость ---
+  // --- Итоговая стоимость (складывает обновленные компоненты) ---
   const totalCost =
     costInRub +
-    deliveryCost +
+    deliveryCost + // <<< Включает обновленную стоимость доставки
     totalCustomsPayment +
     customsFees +
     utilizationFee +
-    оформленияSbktsepts +
+    оформленияSbktsepts + // <<< Включает обновленную стоимость услуг
     companyCommission;
-  details.push(`--- ИТОГО: ${formatRub(totalCost)} ---`);
+  details.push(`---`); // Разделитель перед итогом
+  details.push(`ИТОГО: ${formatRub(totalCost)}`);
 
-  // Возвращаем объект результата с добавленными полями
+  // Возвращаем объект результата (без изменений в структуре)
   return {
-    country: params.country, // Добавили страну
-    costInOriginalCurrency: params.cost, // Добавили исходную стоимость
-    originalCurrency: nationalCurrency, // Добавили исходную валюту
+    country: params.country,
+    costInOriginalCurrency: params.cost,
+    originalCurrency: nationalCurrency,
     costInRub,
-    costInEur, // Оставляем для возможной детализации в будущем
+    costInEur,
     deliveryCost,
     totalCustomsPayment,
     customsFees,
@@ -323,6 +403,6 @@ export const calculateCarCost = async (
     оформленияSbktsepts,
     companyCommission,
     totalCost,
-    details, // Возвращаем детали для логов
+    details,
   };
 };

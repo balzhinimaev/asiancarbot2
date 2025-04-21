@@ -67,17 +67,23 @@ export const keyboards = {
     [mainMenuButton()], // Сразу в главное меню
   ]),
 
-  // Калькулятор: тип топлива
+  // --- ИЗМЕНЕННАЯ КЛАВИАТУРА (для Кореи/Китая) ---
+  // Калькулятор: тип топлива (Стандартный)
   calculatorFuelType: Markup.inlineKeyboard([
-    [
-      Markup.button.callback(
-        "⛽ Бензин/Дизель/Гибрид",
-        "calc_fuel_petrol_diesel_hybrid"
-      ),
-    ],
+    [Markup.button.callback("⛽ Бензин/Дизель", "calc_fuel_petrol_diesel")], // Изменено
+    [Markup.button.callback("🌱 Гибрид", "calc_fuel_hybrid")], // Добавлено
     [Markup.button.callback("⚡ Электро", "calc_fuel_electric")],
     [backButton()], // Назад к предыдущему шагу
   ]),
+  // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+  // --- НОВАЯ КЛАВИАТУРА (для Японии) ---
+  calculatorFuelTypeJapan: Markup.inlineKeyboard([
+    [Markup.button.callback("⛽ Бензин/Дизель", "calc_fuel_petrol_diesel")],
+    [Markup.button.callback("🌱 Гибрид", "calc_fuel_hybrid")],
+    [backButton()], // Назад к предыдущему шагу
+  ]),
+  // --- КОНЕЦ НОВОЙ КЛАВИАТУРЫ ---
 
   // Калькулятор: возраст авто
   calculatorCarAge: Markup.inlineKeyboard([

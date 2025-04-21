@@ -17,7 +17,7 @@ export interface CalculateCarWizardSession extends Scenes.WizardSessionData {
   country?: "korea" | "china" | "japan";
   cost?: number; // Стоимость в нац. валюте
   currency?: "KRW" | "CNY" | "JPY"; // Валюта
-  fuelType?: "petrol_diesel_hybrid" | "electric"; // Тип топлива
+  fuelType?: "petrol_diesel" | "hybrid" | "electric"; // Тип топлива
   engineVolume?: number; // Объем двигателя (для не-электро)
   enginePower?: number; // Мощность (для электро)
   carAge?: "<3" | "3-5" | ">5"; // Возраст авто
